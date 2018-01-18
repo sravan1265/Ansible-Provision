@@ -1,0 +1,69 @@
+---
+- name: launch ec2 instance and asg
+  hosts: webserver
+  connection: local
+  gather_facts: False
+  tasks:
+    - name: create launch config
+      ec2_lc:
+        name: my_new_lc
+        image_id: ami-84a6f3e7
+        key_name: VCX Keypair
+        region: ap-southeast-1
+        security_groups: sg-173f0971
+        instance_type: t2.micro
+        assign_public_ip: yes
+    - name: Configure Auto Scaling Group
+      ec2_asg:
+        name: myasg
+        launch_config_name: my_new_lc # after launch config we  need to configure "ec2_scaling_policy"
+        availability_zones: ap-southeast-1a
+        health_check_type: ELB
+        health_check_period: 60
+        min_size: 1
+        max_size: 3
+        desired_capacity: 2
+        vpc_zone_identifier: subnet-3a6aef73
+        region: ap-southeast-1
+        state: present
+      register: asg_result
+      name: create scaling policy
+    - ec2_scaling_policy:
+        state: present
+        region: ap-southeast-1
+        name: "scaledown-policy"
+        adjustment_type: "ChangeInCapacity"
+        asg_name: "myasg"
+        scaling_adjustment: -1
+        min_adjustment_step: 1
+        cooldown: 300
+      with_items:
+        - name: "Increase Group Size"
+          adjustment_type: "ChangeInCapacity"
+          scaling_adjustment: +1
+          min_adjustment_step: 1
+          cooldown: 180
+        - name: "Decrease Group Size"
+          adjustment_type: "ChangeInCapacity"
+          scaling_adjustment: -1
+          min_adjustment_step: 1
+          cooldown: 300
+      register: sp_result
+    - name: Debug result of scaling policy creation
+      debug: var=sp_result
+    - name: "testing ec2 alarm module"
+      ec2_metric_alarm:
+        region: "ap-southeast-1"
+        state: "present"
+        name: "cpu-low"
+        metric: "CPUUtilization"
+        namespace: "AWS/EC2"
+        statistic: Average
+        comparison: "<="
+        threshold: 5.0
+        period: 300
+        evaluation_periods: 3
+        unit: "Percent"
+        description: "testing"
+        dimensions: {'InstanceId':'i-XXX'}
+

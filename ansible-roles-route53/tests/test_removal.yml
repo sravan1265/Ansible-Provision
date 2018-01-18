@@ -1,0 +1,22 @@
+---
+- name: Testing the idempotence of removal
+  hosts: localhost
+  vars_files: [ './vars/removal.yml' ]
+  pre_tasks:
+    - include: get_vpc_id.yml
+    - include: get_zone_id.yml
+
+  roles:
+    - route53
+
+  tasks:
+    - pause:
+        minutes: 1
+
+    - name: DNS records should be removed
+      assert:
+        that:
+          - "'NXDOMAIN' == '{{ lookup('dig', 'chewy.arch-admin.com.', '@8.8.8.8') }}'"
+          - "'NXDOMAIN' == '{{ lookup('dig', 'lottie.arch-admin.com.', '@8.8.8.8') }}'"
+          - "'NXDOMAIN' == '{{ lookup('dig', 'lara.arch-admin.com.', '@8.8.8.8') }}'"
+          - "'NXDOMAIN' == '{{ lookup('dig', 'minnie.arch-admin.com.', '@8.8.8.8') }}'"

@@ -1,0 +1,88 @@
+---
+- name: spin up the load balancer and add the servers to it
+  hosts: webserver
+  connection: local
+  gather_facts: False
+  tasks:
+    - name: setup a simple load balancer
+      ec2_elb_lb:
+        name: aws-blog-elb
+        state: present
+        region: ap-southeast-1
+        zones:
+          - ap-southeast-1a
+        listeners:
+          - protocol: http
+            load_balancer_port: 80
+            instance_port: 80
+      register: aws-elb
+    - name: Configure Auto Scaling Group 
+      ec2_asg:
+        region: ap-southeast-1
+        name: VCXwebapp
+        launch_config_name: webapp
+        availability_zones: ap-southeast-1a
+        health_check_type: ELB
+        health_check_period: 300
+        desired_capacity: "{{ asg_properties.DesiredCapacity | default(2) }}"
+        replace_all_instances: yes
+        replace_batch_size: "{{ (asg_properties.DesiredCapacity | default(2) / 4) | round(0, 'ceil') | int }}"
+        min_size: 2
+        max_size: 10
+        state: present
+      register: asg_result
+    - name: Configure Scaling Policies
+      ec2_scaling_policy:
+        region: ap-southeast-1
+        name: Config_Scaling_Policies
+        asg_name: webapp
+        state: present
+        adjustment_type: "{{ item.adjustment_type }}"
+        min_adjustment_step: "{{ item.min_adjustment_step }}"
+        scaling_adjustment: "{{ item.scaling_adjustment }}"
+        cooldown: "{{ item.cooldown }}"
+        with_items:
+          - name: "Increase Group Size"
+        adjustment_type: "ChangeInCapacity"
+        scaling_adjustment: +1
+        min_adjustment_step: 1
+#        cooldown: 180
+#          - name: "Decrease Group Size"
+#        adjustment_type: "ChangeInCapacity"
+#        scaling_adjustment: -1
+#        min_adjustment_step: 1
+#        cooldown: 300
+      register: sp_result
+    - name: Determine Metric Alarm configuration
+      set_fact:
+        metric_alarms:
+          - name: "{{ asg_name }}-ScaleUp"
+        comparison: ">="
+        threshold: 50.0
+        alarm_actions:
+          - "{{ sp_result.results[0].arn }}"
+      - name: "{{ asg_name }}-ScaleDown"
+        comparison: "<="
+        threshold: 20.0
+        alarm_actions:
+          - "{{ sp_result.results[1].arn }}"
+
+- name: Configure Metric Alarms and link to Scaling Policies
+  ec2_metric_alarm:
+    region: ap-southeast-1
+    name: MetricAlaram
+    state: present
+    metric: "CPUUtilization"
+    namespace: "AWS/EC2"
+    statistic: "Average"
+    comparison: "{{ item.comparison }}"
+    threshold: "{{ item.threshold }}"
+    period: 60
+    evaluation_periods: 5
+    unit: "Percent"
+    dimensions:
+      AutoScalingGroupName: "{{ asg_name }}"
+    alarm_actions: "{{ item.alarm_actions }}"
+  with_items: metric_alarms
+  when: max_size > 1
+  register: ma_result

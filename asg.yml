@@ -1,0 +1,41 @@
+---
+- name: launch ec2 instance and asg
+  hosts: webserver
+  connection: local
+  gather_facts: False
+  tasks:
+#    - name: setup a simple load balancer
+#      ec2_elb_lb:
+#        name: aws-blog-elb
+#        state: present
+#        region: ap-southeast-1
+#        zones:
+#          - ap-southeast-1a
+#        listeners:
+#          - protocol: http
+#            load_balancer_port: 80
+#            instance_port: 80
+#      register: aws-elb
+    - name: create launch config
+      ec2_lc:
+        name: my_new_lc
+        image_id: ami-84a6f3e7
+        key_name: VCX Keypair
+        region: ap-southeast-1
+        security_groups: sg-173f0971
+        instance_type: t2.micro
+        assign_public_ip: yes
+    - name: Configure Auto Scaling Group
+      ec2_asg:
+        name: myasg
+        launch_config_name: my_new_lc
+        availability_zones: ap-southeast-1a
+        health_check_type: ELB
+        health_check_period: 60
+        min_size: 1
+        max_size: 3
+        desired_capacity: 2
+        vpc_zone_identifier: subnet-3a6aef73
+        region: ap-southeast-1
+        state: present
+      register: asg_result

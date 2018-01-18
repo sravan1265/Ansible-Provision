@@ -1,5 +1,0 @@
-let g:netrw_dirhistmax  =10
-let g:netrw_dirhist_cnt =3
-let g:netrw_dirhist_1='/home/temp/terraform-ansible-aws-vpc-ha-wordpress/secret'
-let g:netrw_dirhist_2='/home/vcx/ansible/sample_playbooks/ansible-provision/inventory'
-let g:netrw_dirhist_3='/home/vcx/ansible/sample_playbooks/ansible-provision/roles/elb'

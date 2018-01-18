@@ -1,0 +1,39 @@
+---
+route53_records_to_remove:
+  - zone: 'arch-admin.com'
+    records:
+      - record: 'chewy.arch-admin.com'
+        type: A
+        ttl: 10
+        value: '1.1.1.1'
+
+      - record: 'lottie.arch-admin.com'
+        type: CNAME
+        ttl: 10
+        value: 'chewy.arch-admin.com'
+
+      - record: 'lara.arch-admin.com'
+        type: A
+        value: 'chewy.arch-admin.com'
+        alias: True
+        alias_hosted_zone_id: "{{ zone_id }}"
+
+      - record: 'minnie.arch-admin.com'
+        type: A
+        ttl: 10
+        value: '3.3.3.3'
+
+  - zone: 'dummy.com'
+    private_zone: True
+    records:
+      - record: 'ansible-route53-role-test.dummy.com'
+        type: A
+        ttl: 10
+        value: '2.2.2.2'
+
+route53_zones_to_remove:
+  - zone: 'dummy.com'
+    vpc_id: "{{ vpc_id }}"
+    vpc_region: "{{ lookup('ENV', 'AWS_REGION') }}"
+
+  - zone: 'dummy.com'
